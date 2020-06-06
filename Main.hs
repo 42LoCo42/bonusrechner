@@ -107,10 +107,10 @@ modifyPersonMenu p@(nameID, name) dbs = do
   mapM_ (putStr . fightDataText) (zip [1..] record)
   choice <- checkedInputFull id (\c -> null c || (read c :: Int) `elem` [1..7])
   if null choice then start else do
-    putStr "Anzahl Kämpfe (0-2): "
-    fights <- checkedInput (`elem` [0..2]) :: IO Int
-    putStr "Anzahl Sterne (0-6): "
-    stars  <- checkedInput (`elem` [0..6]) :: IO Int
+    putStr "Anzahl Kämpfe (0-1): "
+    fights <- checkedInput (`elem` [0..1]) :: IO Int
+    putStr "Anzahl Sterne (0-3): "
+    stars  <- checkedInput (`elem` [0..3]) :: IO Int
     let newVal           = show (fights, stars)
         record'          = setAt (read choice - 1) newVal record
         currentFightDB'' = HS.insert nameID record' currentFightDB'

@@ -20,7 +20,7 @@ getBonusWinners gen (current : previous) = excluded
       filter (`notElem` winnerIDs) candidates ++ getBonusWinners gen' rest
 
 isCandidate :: (String, [String]) -> Bool
-isCandidate (_, vs) = 2 `elem` fights && 1 `notElem` fights
+isCandidate (_, vs) = 1 `elem` fights
   where
     pairs  = map read vs :: [(Int, Int)]
     fights = map fst pairs
