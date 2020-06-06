@@ -28,7 +28,7 @@ checkedInputFull parse check = do
     retry
 
 getRoundStatus :: [DB] -> (Int, Bool)
-getRoundStatus dbs = ((length dbs + 1) `div` 2, odd $ length dbs)
+getRoundStatus dbs = ((length dbs - 1) `div` 2, odd $ length dbs)
 
 showMenu :: [DB] -> ([DB] -> IO ()) -> IO ()
 showMenu dbs menu = do
@@ -37,7 +37,8 @@ showMenu dbs menu = do
   putStrLn "Clash of Clans - Bonusrechner"
   let (roundN, isWin) = getRoundStatus dbs
       prefix          = if isWin then "Neue" else "Aktuelle"
-  putStrLn $ printf "%s Runde: %d" prefix roundN
+  putStrLn $ printf "%s Runde: %d, Monat %d"
+    prefix (roundN `mod` 7 + 1) (roundN `div` 7 + 1)
   menu dbs
 
 nameCheck :: DB -> String -> Maybe (String, String)
