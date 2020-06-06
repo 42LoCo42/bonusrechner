@@ -19,8 +19,9 @@ build-type:          Simple
 
 executable bonusrechner
   main-is:             Main.hs
-  -- other-modules:
+  -- other-modules:       CSV
   -- other-extensions:
-  build-depends:       base >=4.13 && <4.14, random, unordered-containers, csv
+  build-depends:       base >=4.13 && <4.14, random, random-shuffle, unordered-containers,
+                       csv, parsec, directory, ansi-terminal
   -- hs-source-dirs:
   default-language:    Haskell2010

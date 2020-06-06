@@ -1,41 +1,149 @@
 module Main where
 
-import qualified Data.HashMap.Strict as HS
-import Data.Either
-import System.IO
+import           Bonus
+import           Config
+import           CSV
+import           DBs
+import           Tools
 
-import CSV
+import           Control.Monad       (when)
+import qualified Data.HashMap.Strict as HS
+import           Data.List           (sortOn)
+import           Data.Maybe          (fromJust)
+import           System.Directory    (createDirectoryIfMissing,
+                                      setCurrentDirectory)
+import           System.IO           (BufferMode (NoBuffering), hSetBuffering,
+                                      stdout)
+import           System.Random       (newStdGen)
+import           Text.Printf         (printf)
 
 main :: IO ()
 main = do
-  parseResult <- parseCSVFromFile "personen.csv"
-  if isLeft parseResult then do
-    putStrLn "Datenbank kann nicht gelesen werden!"
-    print parseResult
-  else do
-    let database = fromRight [] parseResult
-        hashmap  = csvToHS database
-    input <- newPerson
-    print $ input : database
-    print hashmap
-    
-newPerson :: IO Record
-newPerson = do
-  putStr "Name: "
+  createDirectoryIfMissing True dbFolder
+  setCurrentDirectory dbFolder
+  appendFile nameDBFile ""
+  hSetBuffering stdout NoBuffering
+  start
+  setCurrentDirectory ".."
+
+start :: IO ()
+start = do
+  dbs <- loadAll
+  showMenu dbs roundCheckMenu
+
+roundCheckMenu :: [DB] -> IO ()
+roundCheckMenu dbs = do
+  let (roundN, isWin) = getRoundStatus dbs
+  if isWin then do
+    putStr $ printf "Runde starten? j/n "
+    choice <- yesNoChoice
+    when (choice == "j" || choice == "y") $ do
+      appendFile (printf "%d.csv" roundN) ""
+      start
+  else
+    mainMenu dbs
+
+mainMenu :: [DB] -> IO ()
+mainMenu dbs = do
+  putStrLn "Hauptmenü"
+  putStrLn "  1 Neue Person einfügen"
+  putStrLn "  2 Daten ändern"
+  putStrLn "  3 Bonus-Gewinner ermitteln"
+  putStrLn "  4 Beenden"
+  choice <- checkedInput (`elem` [1..4]) :: IO Int
+  case choice of
+    1 -> showMenu dbs newPersonMenu
+    2 -> showMenu dbs choosePersonMenu
+    3 -> showMenu dbs getBonusMenu
+    4 -> return ()
+    _ -> undefined
+
+printAllPersons :: DB -> IO ()
+printAllPersons dbs = do
+  putStrLn "Alle Personen: "
+  mapM_ (\(k, (v:_)) -> printf "  %s %s\n" k v) $
+    sortOn ((read :: String -> Int) . fst) $ HS.toList dbs
+
+newPersonMenu :: [DB] -> IO ()
+newPersonMenu dbs = do
+  let (nameDB : _) = dbs
+  printAllPersons nameDB
+  putStr "Neuen Namen eingeben: "
   name <- getLine
-  putStr "Kämpfe (0, 1 oder 2): "
-  fights <- checkedInput read (\a -> a >= 0 && a <= 2) :: IO Int
-  putStr "Sterne (0 bis 6): "
-  stars <- checkedInput read (\a -> a >= 0 && a <= 6) :: IO Int
-  return [name, show fights, show stars]
+  if null name then start else do
+    let realNameM = nameCheck nameDB name
+    case realNameM of
+      Just (_, realName) -> -- name exists
+        when (name /= realName) $ do -- ... but was entered differently
+          putStrLn $ printf "Ist Name \"%s\" gemeint? j/n" realName
+          choice <- head <$> yesNoChoice
+          when (choice == 'n') $ addNewName name nameDB
+      Nothing -> -- add new id and name
+        addNewName name nameDB
+    dbs' <- loadAll
+    showMenu dbs' newPersonMenu
 
-csvToHS :: CSV -> HS.HashMap String [String]
-csvToHS = foldr (uncurry HS.insert) HS.empty . map recordToKV
+choosePersonMenu :: [DB] -> IO ()
+choosePersonMenu dbs = do
+  let (nameDB : _) = dbs
+  printAllPersons nameDB
+  putStr "Auswahl: "
+  choice <- checkedInputFull id
+    (\c -> null c || c `elem` map fst (HS.toList nameDB))
+  if null choice then start else do
+    let person = (choice, head . fromJust $ HS.lookup choice nameDB)
+    showMenu dbs (modifyPersonMenu person)
 
-checkedInput :: (String -> a) -> (a -> Bool) -> IO a
-checkedInput parser checker = do
-  line <- getLine
-  let val = parser line
-  if checker val
-    then return val
-    else checkedInput parser checker
+modifyPersonMenu :: (String, String) -> [DB] -> IO ()
+modifyPersonMenu p@(nameID, name) dbs = do
+  let (_ : fightDBs)            = dbs
+      currentFightDB            = head fightDBs -- most recent fight is head
+      recordM                   = HS.lookup nameID currentFightDB
+      (record, currentFightDB') = case recordM of -- add empty entry when not found
+        Just r  -> (r, currentFightDB)
+        Nothing -> (newRecord, HS.insert nameID newRecord currentFightDB)
+          where newRecord = replicate 7 "(-1, -1)"
+  putStrLn $ printf "Daten für \"%s\" ändern" name
+  mapM_ (putStr . fightDataText) (zip [1..] record)
+  choice <- checkedInputFull id (\c -> null c || (read c :: Int) `elem` [1..7])
+  if null choice then start else do
+    putStr "Anzahl Kämpfe (0-2): "
+    fights <- checkedInput (`elem` [0..2]) :: IO Int
+    putStr "Anzahl Sterne (0-6): "
+    stars  <- checkedInput (`elem` [0..6]) :: IO Int
+    let newVal           = show (fights, stars)
+        record'          = setAt (read choice - 1) newVal record
+        currentFightDB'' = HS.insert nameID record' currentFightDB'
+        dbs'             = setAt 1 currentFightDB'' dbs
+        (dbIx, _)        = getRoundStatus dbs'
+        dbName           = show dbIx ++ ".csv"
+    writeFile dbName $ showCSV $ dbToCSV currentFightDB''
+    showMenu dbs' (modifyPersonMenu p)
+
+getBonusMenu :: [DB] -> IO ()
+getBonusMenu dbs = do
+  gen <- newStdGen
+  let (_ : fightDBs) = dbs
+      winners        = getBonusWinners gen fightDBs
+  showMenu dbs (changeBonusMenu winners)
+
+changeBonusMenu :: [String] -> [DB] -> IO ()
+changeBonusMenu ids dbs = do
+  let (nameDB : currentFightDB : _) = dbs
+      (chosen, rest) = splitAt 8 ids
+  mapM_ (putStr . bonusWinnerText nameDB currentFightDB)
+    (zip ([1..] :: [Int]) chosen)
+  putStrLn $ printf "Noch %d Alternativen\nEnter oder Abwahl: " (length rest)
+  choice <- checkedInputFull id (\c -> null c || (read c :: Int) `elem` [1 .. length chosen])
+  if null choice then do
+    let curRound = fst $ getRoundStatus dbs
+    saveBonus chosen $ show curRound ++ "g.csv"
+  else do
+    let removeIx = read choice - 1 :: Int
+        newIds   = removeAt removeIx ids
+    showMenu dbs (changeBonusMenu newIds)
+
+saveBonus :: [String] -> String -> IO ()
+saveBonus ids file = do
+  writeFile file $ unlines ids
+  start
