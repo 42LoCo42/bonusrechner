@@ -36,7 +36,7 @@ roundCheckMenu dbs = do
   let (roundN, isWin) = getRoundStatus dbs
   if isWin
     then do
-      putStr $ printf "Runde starten? j/n "
+      putStr $ printf "Krieg starten? j/n "
       choice <- yesNoChoice
       when (choice == "j" || choice == "y") $ do
         appendFile (printf "%d.csv" roundN) ""
@@ -84,7 +84,7 @@ newPersonMenu dbs = do
             when (choice == 'n') $ addNewName name nameDB
         Nothing -- add new id and name
          -> addNewName name nameDB
-      dbs' <- loadAll
+      dbs' <- loadAll -- TODO: don't reload every time, use modified db from addNewName?
       showMenu dbs' newPersonMenu
 
 choosePersonMenu :: [DB] -> IO ()
@@ -145,16 +145,18 @@ changeBonusMenu ids dbs = do
   mapM_
     (putStr . bonusWinnerText nameDB currentFightDB)
     (zip ([1 ..] :: [Int]) chosen)
-  putStrLn $ printf "Noch %d Alternativen\nEnter oder Abwahl: " (length rest)
+  putStr $ printf "Noch %d Alternativen\n" (length rest)
+  putStr "Enter, [s]peichern oder Abwahl: "
   choice <-
     checkedInputFull
       id
-      (\c -> null c || (read c :: Int) `elem` [1 .. length chosen])
-  if null choice
-    then do
+      (\c -> null c || c == "s" || (read c :: Int) `elem` [1 .. length chosen])
+  case choice of
+    [] -> start
+    "s" -> do
       let curRound = fst $ getRoundStatus dbs
       saveBonus chosen $ show curRound ++ "g.csv"
-    else do
+    _ -> do
       let removeIx = read choice - 1 :: Int
           newIds = removeAt removeIx ids
       showMenu dbs (changeBonusMenu newIds)

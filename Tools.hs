@@ -42,14 +42,9 @@ showMenu dbs menu = do
   let (roundN, isWin) = getRoundStatus dbs
       prefix =
         if isWin
-          then "Neue"
-          else "Aktuelle"
-  putStrLn $
-    printf
-      "%s Runde: %d, Monat %d"
-      prefix
-      (roundN `mod` 7 + 1)
-      (roundN `div` 7 + 1)
+          then "Neuer"
+          else "Aktueller"
+  putStrLn $ printf "%s Krieg: %d" prefix (roundN + 1)
   menu dbs
 
 nameCheck :: DB -> String -> Maybe (String, String)
