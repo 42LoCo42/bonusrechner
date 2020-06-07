@@ -10,7 +10,7 @@ import System.Directory
 loadAll :: IO [DB]
 loadAll = do
   nameDB <- loadDB nameDBFile
-  fightDBs <- loadFightDB 1 False
+  fightDBs <- loadFightDB 0 False
   return (nameDB : reverse fightDBs)
 
 loadFightDB :: Int -> Bool -> IO [DB]
