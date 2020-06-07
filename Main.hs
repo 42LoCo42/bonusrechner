@@ -2,22 +2,24 @@
 
 module Main where
 
-import Bonus
-import CSV
-import Config
-import DBs
-import Tools
+import           Bonus
+import           Config
+import           CSV
+import           DBs
+import           Tools
 
-import Control.Monad (when)
+import           Control.Monad       (when)
 import qualified Data.HashMap.Strict as HS
-import Data.List (sortOn)
-import Data.Maybe (fromJust)
-import System.Directory (createDirectoryIfMissing, setCurrentDirectory)
-import System.IO (BufferMode(NoBuffering), hSetBuffering, stdout)
-import System.Random (newStdGen)
-import Text.Printf (printf)
+import           Data.List           (sortOn)
+import           Data.Maybe          (fromJust)
+import           System.Directory    (createDirectoryIfMissing,
+                                      setCurrentDirectory)
+import           System.IO           (BufferMode (NoBuffering), hSetBuffering,
+                                      stdout)
+import           System.Random       (newStdGen)
+import           Text.Printf         (printf)
 
-main :: IO ()
+main ∷ IO ()
 main = do
   createDirectoryIfMissing True dbFolder
   setCurrentDirectory dbFolder
@@ -26,12 +28,12 @@ main = do
   start
   setCurrentDirectory ".."
 
-start :: IO ()
+start ∷ IO ()
 start = do
   dbs <- loadAll
   showMenu dbs roundCheckMenu
 
-roundCheckMenu :: [DB] -> IO ()
+roundCheckMenu ∷ [DB] → IO ()
 roundCheckMenu dbs = do
   let (roundN, isWin) = getRoundStatus dbs
   if isWin
@@ -43,7 +45,7 @@ roundCheckMenu dbs = do
         start
     else mainMenu dbs
 
-mainMenu :: [DB] -> IO ()
+mainMenu ∷ [DB] → IO ()
 mainMenu dbs = do
   putStrLn "Hauptmenü"
   putStrLn "  1 Neue Person einfügen"
@@ -58,13 +60,13 @@ mainMenu dbs = do
     4 -> return ()
     _ -> undefined
 
-printAllPersons :: DB -> IO ()
+printAllPersons ∷ DB → IO ()
 printAllPersons dbs = do
   putStrLn "Alle Personen: "
   mapM_ (\(k, (v:_)) -> printf "  %s %s\n" k v) $
-    sortOn ((read :: String -> Int) . fst) $ HS.toList dbs
+    sortOn ((read :: String → Int) . fst) $ HS.toList dbs
 
-newPersonMenu :: [DB] -> IO ()
+newPersonMenu ∷ [DB] → IO ()
 newPersonMenu dbs = do
   let (nameDB:_) = dbs
   printAllPersons nameDB
@@ -87,7 +89,7 @@ newPersonMenu dbs = do
       dbs' <- loadAll -- TODO: don't reload every time, use modified db from addNewName?
       showMenu dbs' newPersonMenu
 
-choosePersonMenu :: [DB] -> IO ()
+choosePersonMenu ∷ [DB] → IO ()
 choosePersonMenu dbs = do
   let (nameDB:_) = dbs
   printAllPersons nameDB
@@ -100,7 +102,7 @@ choosePersonMenu dbs = do
       let person = (choice, head . fromJust $ HS.lookup choice nameDB)
       showMenu dbs (modifyPersonMenu person)
 
-modifyPersonMenu :: (String, String) -> [DB] -> IO ()
+modifyPersonMenu ∷ (String, String) → [DB] → IO ()
 modifyPersonMenu p@(nameID, name) dbs = do
   let (_:fightDBs) = dbs
       currentFightDB = head fightDBs -- most recent fight is head
@@ -111,34 +113,58 @@ modifyPersonMenu p@(nameID, name) dbs = do
           Just r -> (r, currentFightDB)
           Nothing -> (newRecord, HS.insert nameID newRecord currentFightDB)
             where newRecord = replicate 7 "(-1, -1)"
+      newDay = countRealData record + 1
+      -- show data of all days
+      showAllDays = mapM_ (putStr . fightDataText) (zip [1 ..] record)
+      -- read fights and stars
+      modifyDayMenu ch = do
+        putStr $ printf "Ändere Tag %d\n" ch
+        putStr "Anzahl Kämpfe (0-1) oder [A]nderen Tag wählen: "
+        fights <-
+          checkedInputFull
+            id
+            (\c -> null c || c == "a" || (read c :: Int) `elem` [0, 1])
+        case fights of
+          []  -> start
+          "a" -> chooseDayMenu
+          _   -> modifyDayMenu2 ch (read fights :: Int)
+      -- get fights, read stars, write both to selected day
+      modifyDayMenu2 ch fights = do
+        stars <-
+          if fights == 0
+            then return 0
+            else do
+              putStr "Anzahl Sterne (0-3): "
+              checkedInput (`elem` [0 .. 3]) :: IO Int
+        let newVal = show (fights, stars)
+            record' = setAt (ch - 1) newVal record
+            currentFightDB'' = HS.insert nameID record' currentFightDB'
+            dbs' = setAt 1 currentFightDB'' dbs
+            (dbIx, _) = getRoundStatus dbs'
+            dbName = show dbIx ++ ".csv"
+        writeFile dbName $ showCSV $ dbToCSV currentFightDB''
+        showMenu dbs' (modifyPersonMenu p)
+      -- read one day and show modifyDayMenu
+      chooseDayMenu = do
+        putStrLn "Tag auswählen (1-7): "
+        choice <-
+          checkedInputFull id (\c -> null c || (read c :: Int) `elem` [1 .. 7])
+        if null choice
+          then start
+          else modifyDayMenu (read choice :: Int)
   putStrLn $ printf "Daten für \"%s\" ändern" name
-  mapM_ (putStr . fightDataText) (zip [1 ..] record)
-  choice <-
-    checkedInputFull id (\c -> null c || (read c :: Int) `elem` [1 .. 7])
-  if null choice
-    then start
-    else do
-      putStr "Anzahl Kämpfe (0-1): "
-      fights <- checkedInput (`elem` [0 .. 1]) :: IO Int
-      putStr "Anzahl Sterne (0-3): "
-      stars <- checkedInput (`elem` [0 .. 3]) :: IO Int
-      let newVal = show (fights, stars)
-          record' = setAt (read choice - 1) newVal record
-          currentFightDB'' = HS.insert nameID record' currentFightDB'
-          dbs' = setAt 1 currentFightDB'' dbs
-          (dbIx, _) = getRoundStatus dbs'
-          dbName = show dbIx ++ ".csv"
-      writeFile dbName $ showCSV $ dbToCSV currentFightDB''
-      showMenu dbs' (modifyPersonMenu p)
+  showAllDays
+  modifyDayMenu newDay
 
-getBonusMenu :: [DB] -> IO ()
+--        fights <- checkedInput (`elem` [0 .. 1]) :: IO Int
+getBonusMenu ∷ [DB] → IO ()
 getBonusMenu dbs = do
   gen <- newStdGen
   let (_:fightDBs) = dbs
       winners = getBonusWinners gen fightDBs
   showMenu dbs (changeBonusMenu winners)
 
-changeBonusMenu :: [String] -> [DB] -> IO ()
+changeBonusMenu ∷ [String] → [DB] → IO ()
 changeBonusMenu ids dbs = do
   let (nameDB:currentFightDB:_) = dbs
       (chosen, rest) = splitAt 8 ids
@@ -161,7 +187,7 @@ changeBonusMenu ids dbs = do
           newIds = removeAt removeIx ids
       showMenu dbs (changeBonusMenu newIds)
 
-saveBonus :: [String] -> String -> IO ()
+saveBonus ∷ [String] → String → IO ()
 saveBonus ids file = do
   writeFile file $ unlines ids
   start
