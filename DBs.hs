@@ -1,3 +1,4 @@
+{-# LANGUAGE UnicodeSyntax #-}
 module DBs where
 
 import Config
@@ -5,13 +6,13 @@ import CSV
 
 import System.Directory
 
-loadAll :: IO [DB]
+loadAll ∷ IO [DB]
 loadAll = do
   nameDB   <- loadDB nameDBFile
   fightDBs <- loadFightDB 1 False
   return (nameDB : reverse fightDBs)
 
-loadFightDB :: Int -> Bool -> IO [DB]
+loadFightDB ∷ Int → Bool → IO [DB]
 loadFightDB ix isWin = do
   let file = show ix ++ (if isWin then "g.csv" else ".csv")
   exists <- doesFileExist file

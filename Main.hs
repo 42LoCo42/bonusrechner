@@ -1,3 +1,4 @@
+{-# LANGUAGE UnicodeSyntax #-}
 module Main where
 
 import           Bonus
@@ -17,7 +18,7 @@ import           System.IO           (BufferMode (NoBuffering), hSetBuffering,
 import           System.Random       (newStdGen)
 import           Text.Printf         (printf)
 
-main :: IO ()
+main ∷ IO ()
 main = do
   createDirectoryIfMissing True dbFolder
   setCurrentDirectory dbFolder
@@ -26,12 +27,12 @@ main = do
   start
   setCurrentDirectory ".."
 
-start :: IO ()
+start ∷ IO ()
 start = do
   dbs <- loadAll
   showMenu dbs roundCheckMenu
 
-roundCheckMenu :: [DB] -> IO ()
+roundCheckMenu ∷ [DB] → IO ()
 roundCheckMenu dbs = do
   let (roundN, isWin) = getRoundStatus dbs
   if isWin then do
@@ -43,7 +44,7 @@ roundCheckMenu dbs = do
   else
     mainMenu dbs
 
-mainMenu :: [DB] -> IO ()
+mainMenu ∷ [DB] → IO ()
 mainMenu dbs = do
   putStrLn "Hauptmenü"
   putStrLn "  1 Neue Person einfügen"
@@ -58,13 +59,13 @@ mainMenu dbs = do
     4 -> return ()
     _ -> undefined
 
-printAllPersons :: DB -> IO ()
+printAllPersons ∷ DB → IO ()
 printAllPersons dbs = do
   putStrLn "Alle Personen: "
   mapM_ (\(k, (v:_)) -> printf "  %s %s\n" k v) $
-    sortOn ((read :: String -> Int) . fst) $ HS.toList dbs
+    sortOn ((read :: String → Int) . fst) $ HS.toList dbs
 
-newPersonMenu :: [DB] -> IO ()
+newPersonMenu ∷ [DB] → IO ()
 newPersonMenu dbs = do
   let (nameDB : _) = dbs
   printAllPersons nameDB
@@ -83,7 +84,7 @@ newPersonMenu dbs = do
     dbs' <- loadAll
     showMenu dbs' newPersonMenu
 
-choosePersonMenu :: [DB] -> IO ()
+choosePersonMenu ∷ [DB] → IO ()
 choosePersonMenu dbs = do
   let (nameDB : _) = dbs
   printAllPersons nameDB
@@ -94,7 +95,7 @@ choosePersonMenu dbs = do
     let person = (choice, head . fromJust $ HS.lookup choice nameDB)
     showMenu dbs (modifyPersonMenu person)
 
-modifyPersonMenu :: (String, String) -> [DB] -> IO ()
+modifyPersonMenu ∷ (String, String) → [DB] → IO ()
 modifyPersonMenu p@(nameID, name) dbs = do
   let (_ : fightDBs)            = dbs
       currentFightDB            = head fightDBs -- most recent fight is head
@@ -120,14 +121,14 @@ modifyPersonMenu p@(nameID, name) dbs = do
     writeFile dbName $ showCSV $ dbToCSV currentFightDB''
     showMenu dbs' (modifyPersonMenu p)
 
-getBonusMenu :: [DB] -> IO ()
+getBonusMenu ∷ [DB] → IO ()
 getBonusMenu dbs = do
   gen <- newStdGen
   let (_ : fightDBs) = dbs
       winners        = getBonusWinners gen fightDBs
   showMenu dbs (changeBonusMenu winners)
 
-changeBonusMenu :: [String] -> [DB] -> IO ()
+changeBonusMenu ∷ [String] → [DB] → IO ()
 changeBonusMenu ids dbs = do
   let (nameDB : currentFightDB : _) = dbs
       (chosen, rest) = splitAt 8 ids
@@ -143,7 +144,7 @@ changeBonusMenu ids dbs = do
         newIds   = removeAt removeIx ids
     showMenu dbs (changeBonusMenu newIds)
 
-saveBonus :: [String] -> String -> IO ()
+saveBonus ∷ [String] → String → IO ()
 saveBonus ids file = do
   writeFile file $ unlines ids
   start
