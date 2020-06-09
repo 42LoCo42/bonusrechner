@@ -94,10 +94,18 @@ fightDataText (ix, raw)
     (fights, stars) = read raw :: (Int, Int)
 
 bonusWinnerText ∷ DB → DB → (Int, String) → String
-bonusWinnerText nameDB currentFightDB (ix, nameID)
-  | null fightData = printf "  %d: %s (Keine Daten in dieser Runde)\n" ix name
-  | otherwise =
-    printf "  %d: %s (%d Kämpfe, %d Sterne)\n" ix name sumFights sumStars
+bonusWinnerText nameDB currentFightDB (ix, nameID) = printf "  %d: %s" ix stat
+  where
+    stat = statisticText nameDB currentFightDB nameID
+
+summaryText ∷ DB → DB → String → String
+summaryText nameDB currentFightDB nameID =
+  "  " ++ statisticText nameDB currentFightDB nameID
+
+statisticText ∷ DB → DB → String → String
+statisticText nameDB currentFightDB nameID
+  | null fightData = printf "%s (Keine Daten in dieser Runde)\n" name
+  | otherwise = printf "%s (%d Kämpfe, %d Sterne)\n" name sumFights sumStars
   where
     name = head $ fromJust $ HS.lookup nameID nameDB
     fightData = HS.lookupDefault [] nameID currentFightDB

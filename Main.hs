@@ -51,13 +51,15 @@ mainMenu dbs = do
   putStrLn "  1 Neue Person einfügen"
   putStrLn "  2 Daten ändern"
   putStrLn "  3 Bonus-Gewinner ermitteln"
-  putStrLn "  4 Beenden"
-  choice <- checkedInput (`elem` [1 .. 4]) :: IO Int
+  putStrLn "  4 Übersicht anzeigen"
+  putStrLn "  5 Beenden"
+  choice <- checkedInput (`elem` [1 .. 5]) :: IO Int
   case choice of
     1 -> showMenu dbs newPersonMenu
     2 -> showMenu dbs choosePersonMenu
     3 -> showMenu dbs getBonusMenu
-    4 -> return ()
+    4 -> showMenu dbs summaryMenu
+    5 -> return ()
     _ -> undefined
 
 printAllPersons ∷ DB → IO ()
@@ -156,7 +158,6 @@ modifyPersonMenu p@(nameID, name) dbs = do
   showAllDays
   modifyDayMenu newDay
 
---        fights <- checkedInput (`elem` [0 .. 1]) :: IO Int
 getBonusMenu ∷ [DB] → IO ()
 getBonusMenu dbs = do
   gen <- newStdGen
@@ -166,8 +167,12 @@ getBonusMenu dbs = do
 
 changeBonusMenu ∷ [String] → [DB] → IO ()
 changeBonusMenu ids dbs = do
+  putStr "Wie viele Gewinner? "
+  winnerN <- checkedInput (const True) :: IO Int
+  putStrLn "======================"
+  putStrLn "Gewinner"
   let (nameDB:currentFightDB:_) = dbs
-      (chosen, rest) = splitAt 8 ids
+      (chosen, rest) = splitAt winnerN ids
   mapM_
     (putStr . bonusWinnerText nameDB currentFightDB)
     (zip ([1 ..] :: [Int]) chosen)
@@ -191,3 +196,10 @@ saveBonus ∷ [String] → String → IO ()
 saveBonus ids file = do
   writeFile file $ unlines ids
   start
+
+summaryMenu ∷ [DB] → IO ()
+summaryMenu dbs = do
+  let (nameDB:currentFightDB:_) = dbs
+  mapM_ (putStr . summaryText nameDB currentFightDB) (HS.keys nameDB)
+  _ <- getLine
+  showMenu dbs mainMenu
