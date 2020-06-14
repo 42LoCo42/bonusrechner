@@ -15,12 +15,15 @@ import qualified Data.HashMap.Strict as HS
 import           Lens.Micro          (at, each, ix, traverseOf, (%~), (&), (^.))
 import           System.Directory    (createDirectoryIfMissing,
                                       setCurrentDirectory)
+import           System.IO           (BufferMode (NoBuffering), hSetBuffering,
+                                      stdout)
 import           System.Random       (split)
 import           Text.Printf         (printf)
 import           Text.Read           (readMaybe)
 
 main ∷ IO ()
 main = do
+  hSetBuffering stdout NoBuffering
   createDirectoryIfMissing True dbDir
   setCurrentDirectory dbDir
   convertAll
